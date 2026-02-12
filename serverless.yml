@@ -15,5 +15,3 @@ functions:
     events:
       - httpApi: '*'
 
-plugins:
-  - serverless-offline
