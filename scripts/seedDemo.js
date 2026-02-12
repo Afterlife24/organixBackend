@@ -7,7 +7,7 @@ const User = require('../models/User');
 const seedDemoUser = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/todoapp');
+    await mongoose.connect("mongodb+srv://toDo_db:YYSPvKFfmpMDWjSk@todo.azm8iyj.mongodb.net/?appName=Cluster0" || 'mongodb://localhost:27017/todoapp');
     console.log('Connected to MongoDB');
 
     // Check if demo user already exists

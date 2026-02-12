@@ -44,7 +44,7 @@ let isConnected = false;
 const connectDB = async () => {
   if (isConnected) return;
 
-  await mongoose.connect(process.env.MONGODB_URI, {
+  await mongoose.connect("mongodb+srv://toDo_db:YYSPvKFfmpMDWjSk@todo.azm8iyj.mongodb.net/?appName=Cluster0", {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
   });
