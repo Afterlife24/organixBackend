@@ -1,0 +1,17 @@
+service: organix-backend
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-south-1
+  stage: prod
+  environment:
+    MONGODB_URI: ${env:MONGODB_URI}
+
+functions:
+  api:
+    handler: lambda.handler
+    timeout: 30
+    events:
+      - httpApi: '*'
+
