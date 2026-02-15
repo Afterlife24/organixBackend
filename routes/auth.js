@@ -145,7 +145,7 @@ router.post('/login', [
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login',  error: err.message });
+    res.status(500).json({ message: 'Server error during login',  error: error.message });
   }
 });
 
