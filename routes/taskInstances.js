@@ -140,50 +140,55 @@ router.get('/date/:date', auth, async (req, res) => {
     }
     
     // --- Carry-forward logic ---
-    // Find incomplete task instances from past dates whose tasks have already ended
-    // (i.e., the task's endDate is before today, so they wouldn't show up via findTasksForDate)
+    // Only carry forward incomplete past tasks to TODAY, not to arbitrary dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const startOfTargetDay = new Date(targetDate);
     startOfTargetDay.setHours(0, 0, 0, 0);
     
-    // Find all date-based tasks for this user that ended before the target date
-    const pastTasks = await Task.find({
-      userId: req.user._id,
-      endDate: { $ne: null, $lt: startOfTargetDay },
-      startDate: { $ne: null }
-    }).populate('subtasks');
+    const isTargetToday = startOfTargetDay.getTime() === today.getTime();
     
-    console.log('Server: Found past tasks to check for carry-forward:', pastTasks.length);
-    
-    for (const task of pastTasks) {
-      // Skip if this task is already in the active set
-      if (activeTaskIds.has(task._id.toString())) continue;
-      
-      // Check if there's any incomplete instance for this task on any past date
-      const lastIncompleteInstance = await TaskInstance.findOne({
-        taskId: task._id,
+    if (isTargetToday) {
+      // Find all date-based tasks for this user that ended before today
+      const pastTasks = await Task.find({
         userId: req.user._id,
-        completed: false,
-        date: { $lt: startOfTargetDay }
-      }).sort({ date: -1 });
+        endDate: { $ne: null, $lt: startOfTargetDay },
+        startDate: { $ne: null }
+      }).populate('subtasks');
       
-      if (lastIncompleteInstance) {
-        console.log('Server: Carrying forward incomplete task:', task.title);
+      console.log('Server: Found past tasks to check for carry-forward:', pastTasks.length);
+      
+      for (const task of pastTasks) {
+        // Skip if this task is already in the active set
+        if (activeTaskIds.has(task._id.toString())) continue;
         
-        try {
-          // Get or create an instance for the target date
-          const instance = await getOrCreateTaskInstance(task._id, req.user._id, targetDate);
+        // Check if there's any incomplete instance for this task on any past date
+        const lastIncompleteInstance = await TaskInstance.findOne({
+          taskId: task._id,
+          userId: req.user._id,
+          completed: false,
+          date: { $lt: startOfTargetDay }
+        }).sort({ date: -1 });
+        
+        if (lastIncompleteInstance) {
+          console.log('Server: Carrying forward incomplete task:', task.title);
           
-          await instance.populate([
-            { path: 'taskId', select: 'title startDate endDate' },
-            { path: 'subtaskInstances.subtaskId', select: 'title notes' }
-          ]);
-          
-          // Only add if this carried-forward instance is also incomplete
-          if (!instance.completed) {
-            taskInstances.push(instance);
+          try {
+            // Get or create an instance for today
+            const instance = await getOrCreateTaskInstance(task._id, req.user._id, targetDate);
+            
+            await instance.populate([
+              { path: 'taskId', select: 'title startDate endDate' },
+              { path: 'subtaskInstances.subtaskId', select: 'title notes' }
+            ]);
+            
+            // Only add if this carried-forward instance is also incomplete
+            if (!instance.completed) {
+              taskInstances.push(instance);
+            }
+          } catch (instanceError) {
+            console.error('Server: Error carrying forward task:', task._id, instanceError);
           }
-        } catch (instanceError) {
-          console.error('Server: Error carrying forward task:', task._id, instanceError);
         }
       }
     }
