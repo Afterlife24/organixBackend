@@ -38,13 +38,13 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Connect DB (for Lambda reuse)
+// Connect DB
 let isConnected = false;
 
 const connectDB = async () => {
   if (isConnected) return;
 
-  await mongoose.connect("mongodb+srv://toDo_db:YYSPvKFfmpMDWjSk@todo.azm8iyj.mongodb.net/?appName=Cluster0", {
+  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/todoapp', {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
   });
@@ -52,5 +52,18 @@ const connectDB = async () => {
   isConnected = true;
   console.log('MongoDB connected');
 };
+
+// If running directly (not imported as a module), start the server
+if (require.main === module) {
+  connectDB().then(() => {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  }).catch(err => {
+    console.error('Database connection error:', err);
+    process.exit(1);
+  });
+}
 
 module.exports = { app, connectDB };

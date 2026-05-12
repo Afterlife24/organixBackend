@@ -65,6 +65,7 @@ router.post('/register', [
     // List of emails that should automatically get admin access
     const adminEmails = [
       'admin@afterlife.org.in',
+      'demoadmin@afterlife.org.in',
       'xanderash44@gmail.com',
       'ashrith@afterlife.org.in',
       'dhanush@afterlife.org.in',
