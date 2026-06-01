@@ -88,6 +88,79 @@ const getOrCreateTaskInstance = async (taskId, userId, date) => {
   return instance;
 };
 
+// @route   GET /api/task-instances/month-counts/:year/:month
+// @desc    Get pending task counts for each day in a month
+// @access  Private
+router.get('/month-counts/:year/:month', auth, async (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month); // 1-based (1 = January)
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: 'Invalid year or month' });
+    }
+
+    // Get all date-based tasks for this user
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0); // last day of the month
+
+    // Find tasks that overlap with this month
+    const tasks = await Task.find({
+      userId: req.user._id,
+      startDate: { $ne: null, $lte: lastDay },
+      endDate: { $ne: null, $gte: firstDay }
+    });
+
+    // Find existing instances for this month
+    const instances = await TaskInstance.find({
+      userId: req.user._id,
+      date: { $gte: firstDay, $lte: lastDay }
+    });
+
+    // Build a map of date -> count of pending tasks
+    const counts = {};
+
+    // For each day in the month, count how many tasks are active
+    const daysInMonth = lastDay.getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const currentDate = new Date(year, month - 1, d);
+      currentDate.setHours(0, 0, 0, 0);
+
+      // Count tasks whose date range covers this day
+      let pendingCount = 0;
+      for (const task of tasks) {
+        const start = new Date(task.startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(task.endDate);
+        end.setHours(23, 59, 59, 999);
+
+        if (currentDate >= start && currentDate <= end) {
+          // Check if there's a completed instance for this task on this day
+          const instance = instances.find(i =>
+            i.taskId.toString() === task._id.toString() &&
+            new Date(i.date).toDateString() === currentDate.toDateString()
+          );
+
+          // Only count if not completed
+          if (!instance || !instance.completed) {
+            pendingCount++;
+          }
+        }
+      }
+
+      if (pendingCount > 0) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        counts[dateStr] = pendingCount;
+      }
+    }
+
+    res.json({ counts });
+  } catch (error) {
+    console.error('Get month counts error:', error);
+    res.status(500).json({ message: 'Server error while fetching month counts' });
+  }
+});
+
 // @route   GET /api/task-instances/date/:date
 // @desc    Get task instances for a specific date (includes carry-forward of incomplete past tasks)
 // @access  Private
