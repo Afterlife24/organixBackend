@@ -6,6 +6,19 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+const parseLocalDate = (dateInput) => {
+  if (!dateInput) return null;
+
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [year, month, day] = dateInput.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const date = new Date(dateInput);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 // @route   GET /api/tasks
 // @desc    Get all user tasks
 // @access  Private
@@ -122,11 +135,15 @@ router.post('/', [
       return res.status(400).json({ message: 'Both start date and end date must be provided together, or leave both empty for static tasks' });
     }
 
+    // Convert date values to local midnight if provided
+    const localStartDate = parseLocalDate(startDate);
+    const localEndDate = parseLocalDate(endDate);
+
     // Get the next order number for this task type
     let nextOrder = 1;
-    if (startDate && endDate) {
+    if (localStartDate && localEndDate) {
       // For date-based tasks, get the highest order for this date
-      const existingTasks = await Task.findTasksForDate(req.user._id, new Date(startDate));
+      const existingTasks = await Task.findTasksForDate(req.user._id, localStartDate);
       if (existingTasks.length > 0) {
         const maxOrder = Math.max(...existingTasks.map(t => t.order || 0));
         nextOrder = maxOrder + 1;
@@ -154,9 +171,9 @@ router.post('/', [
     };
 
     // Only add dates if both are provided
-    if (startDate && endDate) {
-      taskData.startDate = new Date(startDate);
-      taskData.endDate = new Date(endDate);
+    if (localStartDate && localEndDate) {
+      taskData.startDate = localStartDate;
+      taskData.endDate = localEndDate;
     }
 
     const task = new Task(taskData);
@@ -196,15 +213,18 @@ router.put('/:id', [
 
     // Validate date range if dates are being updated
     if (updates.startDate || updates.endDate) {
-      const startDate = updates.startDate ? new Date(updates.startDate) : task.startDate;
-      const endDate = updates.endDate ? new Date(updates.endDate) : task.endDate;
-      
-      // Normalize dates to start of day for proper comparison
-      if (startDate) startDate.setHours(0, 0, 0, 0);
-      if (endDate) endDate.setHours(0, 0, 0, 0);
+      const startDate = updates.startDate ? parseLocalDate(updates.startDate) : task.startDate;
+      const endDate = updates.endDate ? parseLocalDate(updates.endDate) : task.endDate;
       
       if (endDate && startDate && endDate < startDate) {
         return res.status(400).json({ message: 'End date must be after or equal to start date' });
+      }
+
+      if (updates.startDate) {
+        updates.startDate = startDate;
+      }
+      if (updates.endDate) {
+        updates.endDate = endDate;
       }
     }
 

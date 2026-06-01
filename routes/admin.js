@@ -8,6 +8,19 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+const parseLocalDate = (dateInput) => {
+  if (!dateInput) return null;
+
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [year, month, day] = dateInput.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const date = new Date(dateInput);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 // Middleware to check if user is admin
 const adminAuth = async (req, res, next) => {
   try {
@@ -135,15 +148,11 @@ router.post('/create-task', [
     }
 
     // Validate date range if both dates are provided
+    const localStartDate = parseLocalDate(startDate);
+    const localEndDate = parseLocalDate(endDate);
+
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      
-      // Normalize dates to start of day for proper comparison
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
-      
-      if (end < start) {
+      if (localEndDate && localStartDate && localEndDate < localStartDate) {
         return res.status(400).json({ message: 'End date must be after or equal to start date' });
       }
     }
@@ -155,9 +164,9 @@ router.post('/create-task', [
 
     // Get the next order number for this task type
     let nextOrder = 1;
-    if (startDate && endDate) {
+    if (localStartDate && localEndDate) {
       // For date-based tasks, get the highest order for this date
-      const existingTasks = await Task.findTasksForDate(userId, new Date(startDate));
+      const existingTasks = await Task.findTasksForDate(userId, localStartDate);
       if (existingTasks.length > 0) {
         const maxOrder = Math.max(...existingTasks.map(t => t.order || 0));
         nextOrder = maxOrder + 1;
