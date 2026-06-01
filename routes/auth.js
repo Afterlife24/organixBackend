@@ -121,8 +121,12 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
+    console.log('Login attempt for:', email);
+    console.log('DB URI being used:', process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 50) + '...' : 'NOT SET');
+
     // Find user
     const user = await User.findOne({ email });
+    console.log('User found:', !!user);
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
