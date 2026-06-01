@@ -7,6 +7,8 @@ provider:
   stage: prod
   environment:
     MONGODB_URI: ${env:MONGODB_URI}
+    JWT_SECRET: ${env:JWT_SECRET}
+    NODE_ENV: production
 
 functions:
   api:
