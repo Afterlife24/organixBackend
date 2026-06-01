@@ -424,6 +424,99 @@ router.delete('/reset-codes/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/user-tasks/:userId/month-status/:year/:month
+// @desc    Get task completion status for each day in a month for a user (admin only)
+// @access  Private (Admin)
+router.get('/user-tasks/:userId/month-status/:year/:month', auth, adminAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month); // 1-based
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: 'Invalid year or month' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find tasks that overlap with this month
+    const tasks = await Task.find({
+      userId,
+      startDate: { $ne: null, $lte: lastDay },
+      endDate: { $ne: null, $gte: firstDay }
+    });
+
+    // Find existing instances for this month
+    const TaskInstance = require('../models/TaskInstance');
+    const instances = await TaskInstance.find({
+      userId,
+      date: { $gte: firstDay, $lte: lastDay }
+    });
+
+    // Build status map: "green" = all completed, "red" = past date with incomplete tasks
+    const status = {};
+    const daysInMonth = lastDay.getDate();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const currentDate = new Date(year, month - 1, d);
+      currentDate.setHours(0, 0, 0, 0);
+
+      // Find tasks active on this day
+      const activeTasks = tasks.filter(task => {
+        const start = new Date(task.startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(task.endDate);
+        end.setHours(23, 59, 59, 999);
+        return currentDate >= start && currentDate <= end;
+      });
+
+      if (activeTasks.length === 0) continue;
+
+      // Check completion status for each active task
+      let allCompleted = true;
+      let hasAnyTask = false;
+
+      for (const task of activeTasks) {
+        hasAnyTask = true;
+        const instance = instances.find(i =>
+          i.taskId.toString() === task._id.toString() &&
+          new Date(i.date).toDateString() === currentDate.toDateString()
+        );
+
+        if (!instance || !instance.completed) {
+          allCompleted = false;
+          break;
+        }
+      }
+
+      if (!hasAnyTask) continue;
+
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+      if (allCompleted) {
+        status[dateStr] = 'green';
+      } else if (currentDate < today) {
+        // Past date with incomplete tasks
+        status[dateStr] = 'red';
+      }
+      // Future dates with incomplete tasks get no color (just the count badge)
+    }
+
+    res.json({ status });
+  } catch (error) {
+    console.error('Get user month status error:', error);
+    res.status(500).json({ message: 'Server error while fetching month status' });
+  }
+});
+
 // @route   GET /api/admin/user-tasks/:userId/date/:date
 // @desc    Get task instances for a specific user and date (admin only)
 // @access  Private (Admin)
