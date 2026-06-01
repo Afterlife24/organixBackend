@@ -30,7 +30,7 @@ const generateToken = (userId) => {
 // @access  Public
 router.post('/register', [
   body('name').trim().isLength({ min: 1, max: 50 }).withMessage('Name must be 1-50 characters'),
-  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+  body('email').trim().toLowerCase().isLength({ min: 1 }).withMessage('Please enter a valid username'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ], async (req, res) => {
   try {
@@ -110,7 +110,7 @@ router.post('/register', [
 // @desc    Login user
 // @access  Public
 router.post('/login', [
-  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+  body('email').trim().toLowerCase().isLength({ min: 1 }).withMessage('Please enter a valid username'),
   body('password').exists().withMessage('Password is required')
 ], async (req, res) => {
   try {
@@ -175,7 +175,7 @@ router.get('/me', auth, async (req, res) => {
 // @desc    Reset password with access code
 // @access  Public
 router.post('/reset-password', [
-  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+  body('email').trim().toLowerCase().isLength({ min: 1 }).withMessage('Please enter a valid username'),
   body('code').trim().isLength({ min: 6, max: 6 }).withMessage('Access code must be 6 digits'),
   body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ], async (req, res) => {
@@ -231,7 +231,7 @@ router.post('/reset-password', [
 // @desc    Verify if reset code is valid
 // @access  Public
 router.post('/verify-reset-code', [
-  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+  body('email').trim().toLowerCase().isLength({ min: 1 }).withMessage('Please enter a valid username'),
   body('code').trim().isLength({ min: 6, max: 6 }).withMessage('Access code must be 6 digits')
 ], async (req, res) => {
   try {
