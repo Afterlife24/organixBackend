@@ -8,6 +8,7 @@ const taskRoutes = require('./routes/tasks');
 const subtaskRoutes = require('./routes/subtasks');
 const taskInstanceRoutes = require('./routes/taskInstances');
 const adminRoutes = require('./routes/admin');
+const dailyLogRoutes = require('./routes/dailyLog');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/subtasks', subtaskRoutes);
 app.use('/api/task-instances', taskInstanceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/daily-log', dailyLogRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
