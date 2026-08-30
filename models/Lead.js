@@ -27,6 +27,18 @@ const leadSchema = new mongoose.Schema({
     maxlength: 100,
     default: ''
   },
+  phone: {
+    type: String,
+    trim: true,
+    maxlength: 20,
+    default: ''
+  },
+  email: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+    default: ''
+  },
 
   // pipeline stage
   stage: {

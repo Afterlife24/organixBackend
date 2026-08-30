@@ -93,6 +93,8 @@ router.post('/', [
   body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Name required'),
   body('company').optional().trim().isLength({ max: 100 }),
   body('contact').optional().trim().isLength({ max: 100 }),
+  body('phone').optional().trim().isLength({ max: 20 }),
+  body('email').optional().trim().isEmail().withMessage('Invalid email'),
   body('stage').optional().isIn(['lead', 'conversation', 'meeting', 'proposal', 'client', 'lost']),
   body('serviceInterest').optional().isIn(['website', 'ai-audit', 'linkedin', 'automation', 'other']),
   body('source').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
@@ -103,12 +105,14 @@ router.post('/', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
 
-    const { name, company, contact, stage, serviceInterest, source, nextStep, notes } = req.body;
+    const { name, company, contact, phone, email, stage, serviceInterest, source, nextStep, notes } = req.body;
     const lead = new Lead({
       ownerId: req.user._id,
       name,
       company: company || '',
       contact: contact || '',
+      phone: phone || '',
+      email: email || '',
       stage: stage || 'lead',
       serviceInterest: serviceInterest || 'other',
       source: source || 'cold-call',
@@ -131,6 +135,8 @@ router.patch('/:id', [
   body('name').optional().trim().isLength({ min: 1, max: 100 }),
   body('company').optional().trim().isLength({ max: 100 }),
   body('contact').optional().trim().isLength({ max: 100 }),
+  body('phone').optional().trim().isLength({ max: 20 }),
+  body('email').optional().trim().isEmail(),
   body('stage').optional().isIn(['lead', 'conversation', 'meeting', 'proposal', 'client', 'lost']),
   body('serviceInterest').optional().isIn(['website', 'ai-audit', 'linkedin', 'automation', 'other']),
   body('source').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
@@ -157,7 +163,7 @@ router.patch('/:id', [
     if (req.body.serviceInterest && req.body.serviceInterest !== lead.serviceInterest) changes.push(`Service → ${req.body.serviceInterest}`);
 
     const prevStage = lead.stage;
-    const fields = ['name', 'company', 'contact', 'stage', 'serviceInterest', 'source', 'nextStep', 'notes', 'isArchived'];
+    const fields = ['name', 'company', 'contact', 'phone', 'email', 'stage', 'serviceInterest', 'source', 'nextStep', 'notes', 'isArchived'];
     fields.forEach(f => { if (req.body[f] !== undefined) lead[f] = req.body[f]; });
 
     await lead.save();

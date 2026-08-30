@@ -8,6 +8,18 @@ const outreachSchema = new mongoose.Schema({
     trim: true,
     maxlength: 100
   },
+  phone: {
+    type: String,
+    trim: true,
+    maxlength: 20,
+    default: ''
+  },
+  email: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+    default: ''
+  },
   channel: {
     type: String,
     enum: ['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other'],

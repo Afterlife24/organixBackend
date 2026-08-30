@@ -137,6 +137,8 @@ router.patch('/:date/summary', [
 router.post('/:date/outreach', [
   auth, adminAuth,
   body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Name required'),
+  body('phone').optional().trim().isLength({ max: 20 }),
+  body('email').optional().trim().isEmail().withMessage('Invalid email'),
   body('channel').isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
   body('outcome').isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
   body('followUpNote').optional().trim().isLength({ max: 300 }),
@@ -145,10 +147,12 @@ router.post('/:date/outreach', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
 
-    const { name, channel, outcome, followUpNote } = req.body;
+    const { name, phone, email, channel, outcome, followUpNote } = req.body;
     const log = await getOrCreateLog(req.user._id, req.params.date);
     log.outreach.push({
       name,
+      phone: phone || '',
+      email: email || '',
       channel: channel || 'cold-call',
       outcome: outcome || 'no-response',
       followUpNote: outcome === 'follow-up' ? (followUpNote || '') : '',
