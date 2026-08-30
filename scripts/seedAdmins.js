@@ -10,7 +10,6 @@ const seedAdmins = async () => {
     { name: 'Austin', email: 'austin@afterlife.org.in' },
     { name: 'Dhanush', email: 'dhanush@afterlife.org.in' },
     { name: 'Ashrith', email: 'ashrith@afterlife.org.in' },
-    { name: 'Alroy', email: 'alroy@afterlife.org.in' },
   ];
 
   for (const admin of admins) {

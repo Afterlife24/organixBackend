@@ -1,43 +1,24 @@
 const mongoose = require('mongoose');
 
-const personMetSchema = new mongoose.Schema({
+// Outreach = cold contacts made today (people who are NOT yet leads)
+const outreachSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
     trim: true,
     maxlength: 100
   },
-  role: {
+  channel: {
     type: String,
-    trim: true,
-    maxlength: 100,
-    default: ''
+    enum: ['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other'],
+    default: 'cold-call'
   },
-  hasFollowUp: {
-    type: Boolean,
-    default: false
+  outcome: {
+    type: String,
+    enum: ['interested', 'follow-up', 'not-interested', 'no-response'],
+    default: 'no-response'
   },
   followUpNote: {
-    type: String,
-    trim: true,
-    maxlength: 300,
-    default: ''
-  }
-}, { _id: true });
-
-const leadSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 100
-  },
-  status: {
-    type: String,
-    enum: ['new', 'warm', 'hot'],
-    default: 'new'
-  },
-  followUp: {
     type: String,
     trim: true,
     maxlength: 300,
@@ -61,8 +42,19 @@ const dailyLogSchema = new mongoose.Schema({
     maxlength: 100,
     default: ''
   },
-  peopleMet: [personMetSchema],
-  leads: [leadSchema],
+  outreach: [outreachSchema],
+  wins: {
+    type: String,
+    trim: true,
+    maxlength: 1000,
+    default: ''
+  },
+  blockers: {
+    type: String,
+    trim: true,
+    maxlength: 1000,
+    default: ''
+  },
   notes: {
     type: String,
     trim: true,
@@ -73,7 +65,6 @@ const dailyLogSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// One log per admin per day
 dailyLogSchema.index({ adminId: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('DailyLog', dailyLogSchema);
