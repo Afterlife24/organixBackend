@@ -68,6 +68,41 @@ router.get('/pipeline-counts', auth, adminAuth, async (req, res) => {
   }
 });
 
+// ─── LEAD ACTIVITIES ─────────────────────────────────────────────────────────
+
+// @route   GET /api/leads/activities/date/:date
+// NOTE: must be defined BEFORE /:id to avoid Express treating 'activities' as an id
+router.get('/activities/date/:date', auth, adminAuth, async (req, res) => {
+  try {
+    const { date } = req.params;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Invalid date format' });
+
+    const parsedDate = parseDate(date);
+    const activities = await LeadActivity.find({ adminId: req.user._id, date: parsedDate })
+      .populate('leadId', 'name company stage serviceInterest')
+      .sort({ createdAt: -1 });
+
+    res.json({ activities, date });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/leads/activities/:activityId
+// NOTE: must be defined BEFORE /:id
+router.delete('/activities/:activityId', auth, adminAuth, async (req, res) => {
+  try {
+    const activity = await LeadActivity.findOne({ _id: req.params.activityId, adminId: req.user._id });
+    if (!activity) return res.status(404).json({ message: 'Activity not found' });
+    await activity.deleteOne();
+    res.json({ message: 'Activity deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // @route   GET /api/leads/:id
 // @desc    Get single lead with full activity history
 router.get('/:id', auth, adminAuth, async (req, res) => {
@@ -94,7 +129,7 @@ router.post('/', [
   body('company').optional().trim().isLength({ max: 100 }),
   body('contact').optional().trim().isLength({ max: 100 }),
   body('phone').optional().trim().isLength({ max: 20 }),
-  body('email').optional().trim().isEmail().withMessage('Invalid email'),
+  body('email').optional({ values: 'falsy' }).trim().isEmail().withMessage('Invalid email'),
   body('stage').optional().isIn(['lead', 'conversation', 'meeting', 'proposal', 'client', 'lost']),
   body('serviceInterest').optional().isIn(['website', 'ai-audit', 'linkedin', 'automation', 'other']),
   body('source').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
@@ -136,7 +171,7 @@ router.patch('/:id', [
   body('company').optional().trim().isLength({ max: 100 }),
   body('contact').optional().trim().isLength({ max: 100 }),
   body('phone').optional().trim().isLength({ max: 20 }),
-  body('email').optional().trim().isEmail(),
+  body('email').optional({ values: 'falsy' }).trim().isEmail(),
   body('stage').optional().isIn(['lead', 'conversation', 'meeting', 'proposal', 'client', 'lost']),
   body('serviceInterest').optional().isIn(['website', 'ai-audit', 'linkedin', 'automation', 'other']),
   body('source').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
@@ -209,27 +244,6 @@ router.delete('/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-// ─── LEAD ACTIVITIES ─────────────────────────────────────────────────────────
-
-// @route   GET /api/leads/activities/date/:date
-// @desc    Get all activities logged by current admin on a specific date
-router.get('/activities/date/:date', auth, adminAuth, async (req, res) => {
-  try {
-    const { date } = req.params;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Invalid date format' });
-
-    const parsedDate = parseDate(date);
-    const activities = await LeadActivity.find({ adminId: req.user._id, date: parsedDate })
-      .populate('leadId', 'name company stage serviceInterest')
-      .sort({ createdAt: -1 });
-
-    res.json({ activities, date });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
 // @route   POST /api/leads/:id/activities
 // @desc    Log an activity against a lead
 router.post('/:id/activities', [
@@ -267,20 +281,6 @@ router.post('/:id/activities', [
     }
 
     res.status(201).json({ activity, lead });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// @route   DELETE /api/leads/activities/:activityId
-// @desc    Delete a specific activity
-router.delete('/activities/:activityId', auth, adminAuth, async (req, res) => {
-  try {
-    const activity = await LeadActivity.findOne({ _id: req.params.activityId, adminId: req.user._id });
-    if (!activity) return res.status(404).json({ message: 'Activity not found' });
-    await activity.deleteOne();
-    res.json({ message: 'Activity deleted' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

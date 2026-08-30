@@ -138,9 +138,9 @@ router.post('/:date/outreach', [
   auth, adminAuth,
   body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Name required'),
   body('phone').optional().trim().isLength({ max: 20 }),
-  body('email').optional().trim().isEmail().withMessage('Invalid email'),
-  body('channel').isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
-  body('outcome').isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
+  body('email').optional({ values: 'falsy' }).trim().isEmail().withMessage('Invalid email'),
+  body('channel').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
+  body('outcome').optional().isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
   body('followUpNote').optional().trim().isLength({ max: 300 }),
 ], async (req, res) => {
   try {
