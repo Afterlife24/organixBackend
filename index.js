@@ -10,6 +10,7 @@ const taskInstanceRoutes = require('./routes/taskInstances');
 const adminRoutes = require('./routes/admin');
 const dailyLogRoutes = require('./routes/dailyLog');
 const leadsRoutes = require('./routes/leads');
+const followUpsRoutes = require('./routes/followUps');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/task-instances', taskInstanceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/daily-log', dailyLogRoutes);
 app.use('/api/leads', leadsRoutes);
+app.use('/api/follow-ups', followUpsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

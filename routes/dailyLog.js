@@ -13,8 +13,9 @@ const adminAuth = (req, res, next) => {
 };
 
 const parseDate = (dateStr) => {
+  // Use UTC midnight so all date comparisons are timezone-consistent
   const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day, 0, 0, 0, 0);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 };
 
 const getOrCreateLog = async (adminId, dateStr) => {
@@ -142,12 +143,13 @@ router.post('/:date/outreach', [
   body('channel').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
   body('outcome').optional().isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
   body('followUpNote').optional().trim().isLength({ max: 300 }),
+  body('followUpDate').optional({ values: 'falsy' }).isISO8601().withMessage('Invalid follow-up date'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
 
-    const { name, phone, email, channel, outcome, followUpNote } = req.body;
+    const { name, phone, email, channel, outcome, followUpNote, followUpDate } = req.body;
     const log = await getOrCreateLog(req.user._id, req.params.date);
     log.outreach.push({
       name,
@@ -156,6 +158,7 @@ router.post('/:date/outreach', [
       channel: channel || 'cold-call',
       outcome: outcome || 'no-response',
       followUpNote: outcome === 'follow-up' ? (followUpNote || '') : '',
+      followUpDate: (outcome === 'follow-up' && followUpDate) ? new Date(followUpDate) : null,
     });
     await log.save();
     res.status(201).json({ log });
@@ -188,6 +191,7 @@ router.patch('/:date/outreach/:entryId', [
   body('channel').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
   body('outcome').optional().isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
   body('followUpNote').optional().trim().isLength({ max: 300 }),
+  body('followUpDate').optional({ values: 'falsy' }).isISO8601().withMessage('Invalid follow-up date'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -201,6 +205,9 @@ router.patch('/:date/outreach/:entryId', [
     if (req.body.channel) entry.channel = req.body.channel;
     if (req.body.outcome) entry.outcome = req.body.outcome;
     if (req.body.followUpNote !== undefined) entry.followUpNote = req.body.followUpNote;
+    if (req.body.followUpDate !== undefined) {
+      entry.followUpDate = req.body.followUpDate ? new Date(req.body.followUpDate) : null;
+    }
 
     await log.save();
     res.json({ log });

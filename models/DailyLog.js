@@ -35,6 +35,11 @@ const outreachSchema = new mongoose.Schema({
     trim: true,
     maxlength: 300,
     default: ''
+  },
+  // the actual date the follow-up should happen — drives calendar dot
+  followUpDate: {
+    type: Date,
+    default: null
   }
 }, { _id: true });
 

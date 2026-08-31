@@ -13,7 +13,7 @@ const adminAuth = (req, res, next) => {
 
 const parseDate = (dateStr) => {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d, 0, 0, 0, 0);
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
 };
 
 // ─── LEADS CRUD ──────────────────────────────────────────────────────────────
@@ -176,6 +176,7 @@ router.patch('/:id', [
   body('serviceInterest').optional().isIn(['website', 'ai-audit', 'linkedin', 'automation', 'other']),
   body('source').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
   body('nextStep').optional().trim().isLength({ max: 300 }),
+  body('followUpDate').optional({ values: 'falsy' }).isISO8601().withMessage('Invalid date'),
   body('notes').optional().trim().isLength({ max: 1000 }),
   body('isArchived').optional().isBoolean(),
 ], async (req, res) => {
@@ -198,7 +199,7 @@ router.patch('/:id', [
     if (req.body.serviceInterest && req.body.serviceInterest !== lead.serviceInterest) changes.push(`Service → ${req.body.serviceInterest}`);
 
     const prevStage = lead.stage;
-    const fields = ['name', 'company', 'contact', 'phone', 'email', 'stage', 'serviceInterest', 'source', 'nextStep', 'notes', 'isArchived'];
+    const fields = ['name', 'company', 'contact', 'phone', 'email', 'stage', 'serviceInterest', 'source', 'nextStep', 'followUpDate', 'notes', 'isArchived'];
     fields.forEach(f => { if (req.body[f] !== undefined) lead[f] = req.body[f]; });
 
     await lead.save();

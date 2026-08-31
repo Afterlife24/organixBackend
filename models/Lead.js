@@ -69,6 +69,12 @@ const leadSchema = new mongoose.Schema({
     default: ''
   },
 
+  // date for the next follow-up — drives calendar display
+  followUpDate: {
+    type: Date,
+    default: null
+  },
+
   // date the lead was first added
   firstContactDate: {
     type: Date,
