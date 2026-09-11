@@ -20,7 +20,8 @@ const parseDate = (dateStr) => {
 
 const getOrCreateLog = async (adminId, dateStr) => {
   const date = parseDate(dateStr);
-  let log = await DailyLog.findOne({ adminId, date });
+  const nextDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+  let log = await DailyLog.findOne({ adminId, date: { $gte: date, $lt: nextDay } });
   if (!log) {
     log = new DailyLog({ adminId, date });
     await log.save();
@@ -37,9 +38,10 @@ router.get('/team/:date', auth, adminAuth, async (req, res) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Invalid date format' });
 
     const parsedDate = parseDate(date);
+    const nextDay = new Date(parsedDate.getTime() + 24 * 60 * 60 * 1000);
     const admins = await User.find({ isAdmin: true }).select('_id name email');
-    const logs = await DailyLog.find({ date: parsedDate }).populate('adminId', 'name email');
-    const activities = await LeadActivity.find({ date: parsedDate })
+    const logs = await DailyLog.find({ date: { $gte: parsedDate, $lt: nextDay } }).populate('adminId', 'name email');
+    const activities = await LeadActivity.find({ date: { $gte: parsedDate, $lt: nextDay } })
       .populate('leadId', 'name company stage serviceInterest')
       .populate('adminId', 'name email');
 
@@ -76,9 +78,11 @@ router.get('/:date', auth, adminAuth, async (req, res) => {
     const log = await getOrCreateLog(req.user._id, date);
 
     // also return lead activities for this date so daily log shows full picture
+    const parsedDate = parseDate(date);
+    const nextDay = new Date(parsedDate.getTime() + 24 * 60 * 60 * 1000);
     const leadActivities = await LeadActivity.find({
       adminId: req.user._id,
-      date: parseDate(date)
+      date: { $gte: parsedDate, $lt: nextDay }
     }).populate('leadId', 'name company stage serviceInterest').sort({ createdAt: -1 });
 
     res.json({ log, leadActivities });
