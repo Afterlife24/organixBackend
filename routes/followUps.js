@@ -1,6 +1,8 @@
 const express = require('express');
+const { body, validationResult } = require('express-validator');
 const Lead = require('../models/Lead');
 const DailyLog = require('../models/DailyLog');
+const FollowUpStatus = require('../models/FollowUpStatus');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -24,32 +26,31 @@ const toDateStr = (d) => {
   return `${y}-${m}-${day}`;
 };
 
+// helper: build status map { entryId: { completed, note } }
+const buildStatusMap = (statuses) => {
+  const map = {};
+  statuses.forEach(s => { map[s.entryId.toString()] = { completed: s.completed, note: s.note, _id: s._id }; });
+  return map;
+};
+
 // @route   GET /api/follow-ups/month/:year/:month
-// @desc    Per-day counts: { "2026-09-01": { outreach: 1, leads: 0 }, ... }
-//          Outreach dots appear on followUpDate (not log date)
-//          Lead dots appear on followUpDate
 router.get('/month/:year/:month', auth, adminAuth, async (req, res) => {
   try {
     const year  = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-
     const startDate = utcMidnight(year, month - 1, 1);
-    const endDate   = utcMidnight(year, month,     1); // exclusive
+    const endDate   = utcMidnight(year, month, 1);
 
-    // Lead follow-ups due this month
     const leads = await Lead.find({
       followUpDate: { $gte: startDate, $lt: endDate },
       isArchived: false,
       stage: { $nin: ['client', 'lost'] },
     }).select('followUpDate');
 
-    // All daily logs this month that have any follow-up outreach entries
-    // We look at outreach.followUpDate (the actual follow-up date), not log.date
     const logs = await DailyLog.find({}).select('outreach');
 
     const counts = {};
 
-    // Lead dots
     leads.forEach(lead => {
       if (!lead.followUpDate) return;
       const key = toDateStr(lead.followUpDate);
@@ -57,12 +58,10 @@ router.get('/month/:year/:month', auth, adminAuth, async (req, res) => {
       counts[key].leads += 1;
     });
 
-    // Outreach dots — keyed by outreach.followUpDate (the day the follow-up should happen)
     logs.forEach(log => {
       (log.outreach || []).forEach(entry => {
         if (entry.outcome !== 'follow-up' || !entry.followUpDate) return;
         const fud = new Date(entry.followUpDate);
-        // only count if in this month
         if (fud < startDate || fud >= endDate) return;
         const key = toDateStr(fud);
         if (!counts[key]) counts[key] = { outreach: 0, leads: 0 };
@@ -78,9 +77,7 @@ router.get('/month/:year/:month', auth, adminAuth, async (req, res) => {
 });
 
 // @route   GET /api/follow-ups/date/:date
-// @desc    Full follow-up details for YYYY-MM-DD
-//          Shows outreach entries whose followUpDate = this date
-//          Shows leads whose followUpDate = this date
+// Returns outreach + lead follow-ups with status (completed, note) merged in
 router.get('/date/:date', auth, adminAuth, async (req, res) => {
   try {
     const { date } = req.params;
@@ -91,14 +88,14 @@ router.get('/date/:date', auth, adminAuth, async (req, res) => {
     const parsedDate = parseDateUTC(date);
     const nextDay    = new Date(parsedDate.getTime() + 24 * 60 * 60 * 1000);
 
-    // Lead follow-ups on this exact date
+    // Lead follow-ups
     const leads = await Lead.find({
       followUpDate: { $gte: parsedDate, $lt: nextDay },
       isArchived: false,
       stage: { $nin: ['client', 'lost'] },
     }).populate('ownerId', 'name email');
 
-    // Outreach entries with followUpDate = this date (across ALL logs)
+    // Outreach follow-ups
     const logs = await DailyLog.find({
       'outreach.followUpDate': { $gte: parsedDate, $lt: nextDay },
     }).populate('adminId', 'name email');
@@ -119,9 +116,66 @@ router.get('/date/:date', auth, adminAuth, async (req, res) => {
       });
     });
 
-    res.json({ outreach: outreachFollowUps, leads, date });
+    // Fetch status records for this admin on this date
+    const allIds = [
+      ...outreachFollowUps.map(o => o._id),
+      ...leads.map(l => l._id),
+    ];
+    const statuses = await FollowUpStatus.find({
+      adminId: req.user._id,
+      entryId: { $in: allIds },
+      date: { $gte: parsedDate, $lt: nextDay },
+    });
+    const statusMap = buildStatusMap(statuses);
+
+    // Merge status into each entry
+    const outreachWithStatus = outreachFollowUps.map(o => ({
+      ...o,
+      status: statusMap[o._id.toString()] || { completed: false, note: '' },
+    }));
+    const leadsWithStatus = leads.map(l => ({
+      ...l.toObject(),
+      status: statusMap[l._id.toString()] || { completed: false, note: '' },
+    }));
+
+    res.json({ outreach: outreachWithStatus, leads: leadsWithStatus, date });
   } catch (err) {
     console.error('Follow-ups date error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/follow-ups/status
+// @desc    Toggle completed or update note for a follow-up entry
+router.patch('/status', [
+  auth, adminAuth,
+  body('entryId').notEmpty().withMessage('entryId required'),
+  body('entryType').isIn(['outreach', 'lead']).withMessage('entryType must be outreach or lead'),
+  body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date required YYYY-MM-DD'),
+  body('completed').optional().isBoolean(),
+  body('note').optional().trim().isLength({ max: 500 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+
+    const { entryId, entryType, date, completed, note } = req.body;
+    const parsedDate = parseDateUTC(date);
+
+    // upsert — create if not exists, update if exists
+    const update = {};
+    if (completed !== undefined) update.completed = completed;
+    if (note !== undefined) update.note = note;
+
+    const status = await FollowUpStatus.findOneAndUpdate(
+      { adminId: req.user._id, entryId, date: parsedDate },
+      { $set: { ...update, entryType } },
+      { upsert: true, new: true }
+    );
+
+    res.json({ status });
+  } catch (err) {
+    console.error('Follow-up status update error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

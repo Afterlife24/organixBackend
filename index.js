@@ -12,6 +12,9 @@ const dailyLogRoutes = require('./routes/dailyLog');
 const leadsRoutes = require('./routes/leads');
 const followUpsRoutes = require('./routes/followUps');
 
+// ensure FollowUpStatus model is registered
+require('./models/FollowUpStatus');
+
 const app = express();
 
 // Middleware
