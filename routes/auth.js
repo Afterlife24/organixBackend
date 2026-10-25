@@ -71,7 +71,6 @@ router.post('/register', [
       'dhanush@afterlife.org.in',
       'austinak@afterlife.org.in',
       'austin@afterlife.org.in',
-      'alroy@afterlife.org.in'
     ];
 
     // Create new user with admin access if email is in the list
