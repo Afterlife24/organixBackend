@@ -101,6 +101,38 @@ router.get('/weekly/:adminId/:startDate', auth, adminAuth, async (req, res) => {
     const logMap = {};
     logs.forEach(l => { logMap[toDateStr(l.date)] = l; });
 
+    // Per-day leads added
+    const allLeadsThisWeek = await Lead.find({
+      ownerId: adminId,
+      createdAt: { $gte: weekStart, $lt: nextWeek },
+    }).select('name company stage serviceInterest source createdAt');
+
+    // Per-day lead activities (stage changes + manual)
+    const allActivities = await LeadActivity.find({
+      adminId,
+      date: { $gte: weekStart, $lt: nextWeek },
+    }).populate('leadId', 'name company').sort({ date: 1 });
+
+    // Group leads and activities by date string
+    const leadsByDay = {};
+    const activitiesByDay = {};
+    allLeadsThisWeek.forEach(l => {
+      const ds = toDateStr(l.createdAt);
+      if (!leadsByDay[ds]) leadsByDay[ds] = [];
+      leadsByDay[ds].push({ name: l.name, company: l.company, stage: l.stage, serviceInterest: l.serviceInterest });
+    });
+    allActivities.forEach(a => {
+      const ds = toDateStr(a.date);
+      if (!activitiesByDay[ds]) activitiesByDay[ds] = [];
+      activitiesByDay[ds].push({
+        leadName: a.leadId?.name || 'Unknown',
+        company: a.leadId?.company || '',
+        stageAfter: a.stageAfter,
+        note: a.note || '',
+        isSystemLog: a.isSystemLog,
+      });
+    });
+
     // Build day-by-day breakdown (7 days Mon–Sun)
     const days = [];
     for (let i = 0; i < 7; i++) {
@@ -108,30 +140,30 @@ router.get('/weekly/:adminId/:startDate', auth, adminAuth, async (req, res) => {
       const ds = toDateStr(dayDate);
       const log = logMap[ds] || null;
       const dayName = DAY_NAMES[dayDate.getUTCDay()];
+      const daySummary = buildDaySummary(log) || {
+        date: ds, station: '', outreachTotal: 0,
+        outreachByOutcome: { interested: 0, 'follow-up': 0, 'not-interested': 0, 'no-response': 0 },
+        outreachByChannel: {}, outreachEntries: [],
+        wins: '', blockers: '', notes: '', taskNotes: '',
+      };
       days.push({
         dayName,
-        ...buildDaySummary(log) || {
-          date: ds, station: '', outreachTotal: 0,
-          outreachByOutcome: { interested: 0, 'follow-up': 0, 'not-interested': 0, 'no-response': 0 },
-          outreachByChannel: {}, outreachEntries: [],
-          wins: '', blockers: '', notes: '',
-        },
+        ...daySummary,
+        leadsAdded: leadsByDay[ds] || [],
+        leadActivities: activitiesByDay[ds] || [],
       });
     }
 
-    // Leads added this week
-    const leadsAdded = await Lead.find({
-      ownerId: adminId,
-      createdAt: { $gte: weekStart, $lt: nextWeek },
-    }).select('name company stage serviceInterest source createdAt');
-
-    // Lead stage changes this week (from LeadActivity)
-    const stageChanges = await LeadActivity.find({
-      adminId,
-      date: { $gte: weekStart, $lt: nextWeek },
-      stageAfter: { $ne: '' },
-      isSystemLog: true,
-    }).populate('leadId', 'name company').sort({ date: 1 });
+    // Week-level aggregates
+    const leadsAdded = allLeadsThisWeek;
+    const stageChanges = allActivities.filter(a => a.stageAfter && a.stageAfter !== '');
+    const stageChangesFormatted = stageChanges.map(sc => ({
+      leadName: sc.leadId?.name || 'Unknown',
+      company: sc.leadId?.company || '',
+      stage: sc.stageAfter,
+      date: toDateStr(sc.date),
+      note: sc.note || '',
+    }));
 
     // Follow-up completion this week
     const followUpStatuses = await FollowUpStatus.find({
@@ -160,13 +192,7 @@ router.get('/weekly/:adminId/:startDate', auth, adminAuth, async (req, res) => {
       weekEnd:   toDateStr(weekEnd),
       days,
       leadsAdded,
-      stageChanges: stageChanges.map(sc => ({
-        leadName: sc.leadId?.name || 'Unknown',
-        company:  sc.leadId?.company || '',
-        stage:    sc.stageAfter,
-        date:     toDateStr(sc.date),
-        note:     sc.note || '',
-      })),
+      stageChanges: stageChangesFormatted,
       totals,
     });
   } catch (err) {
