@@ -18,6 +18,28 @@ const parseDate = (dateStr) => {
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 };
 
+// Returns today's date string in YYYY-MM-DD (UTC)
+const getTodayUTCStr = () => {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// Middleware: block writes to any date other than today
+const todayOnly = (req, res, next) => {
+  const requestedDate = req.params.date;
+  if (!requestedDate) return next();
+  const today = getTodayUTCStr();
+  if (requestedDate !== today) {
+    return res.status(403).json({
+      message: `You can only log for today (${today}). Past dates are locked.`
+    });
+  }
+  next();
+};
+
 const getOrCreateLog = async (adminId, dateStr) => {
   const date = parseDate(dateStr);
   const nextDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
@@ -94,7 +116,7 @@ router.get('/:date', auth, adminAuth, async (req, res) => {
 
 // @route   PATCH /api/daily-log/:date/station
 router.patch('/:date/station', [
-  auth, adminAuth,
+  auth, adminAuth, todayOnly,
   body('station').trim().isLength({ max: 100 })
 ], async (req, res) => {
   try {
@@ -114,7 +136,7 @@ router.patch('/:date/station', [
 // @route   PATCH /api/daily-log/:date/summary
 // @desc    Update wins, blockers, notes
 router.patch('/:date/summary', [
-  auth, adminAuth,
+  auth, adminAuth, todayOnly,
   body('wins').optional().trim().isLength({ max: 1000 }),
   body('blockers').optional().trim().isLength({ max: 1000 }),
   body('notes').optional().trim().isLength({ max: 2000 }),
@@ -142,7 +164,7 @@ router.patch('/:date/summary', [
 
 // @route   POST /api/daily-log/:date/outreach
 router.post('/:date/outreach', [
-  auth, adminAuth,
+  auth, adminAuth, todayOnly,
   body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Name required'),
   body('phone').optional().trim().isLength({ max: 20 }),
   body('email').optional({ values: 'falsy' }).trim().isEmail().withMessage('Invalid email'),
@@ -178,7 +200,7 @@ router.post('/:date/outreach', [
 
 // @route   DELETE /api/daily-log/:date/outreach/:entryId
 // @desc    Remove an outreach entry — supports adminId query param for team view
-router.delete('/:date/outreach/:entryId', auth, adminAuth, async (req, res) => {
+router.delete('/:date/outreach/:entryId', auth, adminAuth, todayOnly, async (req, res) => {
   try {
     // if adminId query param provided, act on that admin's log (team view edit)
     const targetAdminId = req.query.adminId || req.user._id;
@@ -193,9 +215,9 @@ router.delete('/:date/outreach/:entryId', auth, adminAuth, async (req, res) => {
 });
 
 // @route   PATCH /api/daily-log/:date/outreach/:entryId
-// @desc    Update an outreach entry — supports adminId body param for team view edit
+// @desc    Update an outreach entry
 router.patch('/:date/outreach/:entryId', [
-  auth, adminAuth,
+  auth, adminAuth, todayOnly,
   body('channel').optional().isIn(['cold-call', 'linkedin', 'whatsapp', 'event', 'referral', 'other']),
   body('outcome').optional().isIn(['interested', 'follow-up', 'not-interested', 'no-response']),
   body('followUpNote').optional().trim().isLength({ max: 300 }),
