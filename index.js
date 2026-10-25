@@ -11,6 +11,7 @@ const adminRoutes = require('./routes/admin');
 const dailyLogRoutes = require('./routes/dailyLog');
 const leadsRoutes = require('./routes/leads');
 const followUpsRoutes = require('./routes/followUps');
+const reportsRoutes = require('./routes/reports');
 
 // ensure FollowUpStatus model is registered
 require('./models/FollowUpStatus');
@@ -30,6 +31,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/daily-log', dailyLogRoutes);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/follow-ups', followUpsRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
