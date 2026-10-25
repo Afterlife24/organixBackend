@@ -83,6 +83,12 @@ const dailyLogSchema = new mongoose.Schema({
     trim: true,
     maxlength: 2000,
     default: ''
+  },
+  taskNotes: {
+    type: String,
+    trim: true,
+    maxlength: 2000,
+    default: ''
   }
 }, {
   timestamps: true

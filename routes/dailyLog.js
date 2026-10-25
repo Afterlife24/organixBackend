@@ -118,16 +118,18 @@ router.patch('/:date/summary', [
   body('wins').optional().trim().isLength({ max: 1000 }),
   body('blockers').optional().trim().isLength({ max: 1000 }),
   body('notes').optional().trim().isLength({ max: 2000 }),
+  body('taskNotes').optional().trim().isLength({ max: 2000 }),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
 
-    const { wins, blockers, notes } = req.body;
+    const { wins, blockers, notes, taskNotes } = req.body;
     const log = await getOrCreateLog(req.user._id, req.params.date);
     if (wins !== undefined) log.wins = wins;
     if (blockers !== undefined) log.blockers = blockers;
     if (notes !== undefined) log.notes = notes;
+    if (taskNotes !== undefined) log.taskNotes = taskNotes;
     await log.save();
     res.json({ log });
   } catch (err) {

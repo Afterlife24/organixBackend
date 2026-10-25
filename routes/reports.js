@@ -58,6 +58,7 @@ const buildDaySummary = (log) => {
     wins: log.wins || '',
     blockers: log.blockers || '',
     notes: log.notes || '',
+    taskNotes: log.taskNotes || '',
   };
 };
 
@@ -85,7 +86,7 @@ router.get('/weekly/:adminId/:startDate', auth, adminAuth, async (req, res) => {
 
     const [y, m, d] = startDate.split('-').map(Number);
     const weekStart = utcMidnight(y, m - 1, d);
-    const weekEnd   = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000); // 6 days
+    const weekEnd   = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000); // Sun (7 days)
     const nextWeek  = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const admin = await User.findById(adminId).select('name email');
@@ -100,9 +101,9 @@ router.get('/weekly/:adminId/:startDate', auth, adminAuth, async (req, res) => {
     const logMap = {};
     logs.forEach(l => { logMap[toDateStr(l.date)] = l; });
 
-    // Build day-by-day breakdown (6 days)
+    // Build day-by-day breakdown (7 days Mon–Sun)
     const days = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const dayDate = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
       const ds = toDateStr(dayDate);
       const log = logMap[ds] || null;
@@ -209,7 +210,7 @@ router.get('/monthly/:adminId/:year/:month', auth, adminAuth, async (req, res) =
     for (let w = 0; w < 4; w++) {
       const weekStart = new Date(cursor);
       const weekDays = [];
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 7; i++) {  // Mon–Sun
         const dayDate = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
         if (dayDate >= monthEnd) break;
         const ds = toDateStr(dayDate);
@@ -221,7 +222,7 @@ router.get('/monthly/:adminId/:year/:month', auth, adminAuth, async (req, res) =
             date: ds, station: '', outreachTotal: 0,
             outreachByOutcome: { interested: 0, 'follow-up': 0, 'not-interested': 0, 'no-response': 0 },
             outreachByChannel: {}, outreachEntries: [],
-            wins: '', blockers: '', notes: '',
+            wins: '', blockers: '', notes: '', taskNotes: '',
           },
         });
       }
@@ -229,7 +230,7 @@ router.get('/monthly/:adminId/:year/:month', auth, adminAuth, async (req, res) =
         weeks.push({
           weekNumber: w + 1,
           weekStart: toDateStr(weekStart),
-          weekEnd:   toDateStr(new Date(weekStart.getTime() + 5 * 24 * 60 * 60 * 1000)),
+          weekEnd:   toDateStr(new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)), // Sunday
           days: weekDays,
           totals: {
             outreachTotal: weekDays.reduce((a, d) => a + d.outreachTotal, 0),
